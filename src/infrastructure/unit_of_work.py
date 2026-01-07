@@ -1,5 +1,6 @@
 from src.application.common.unit_of_work import IUnitOfWork, OutboxMessage
 
+
 class UnitOfWork(IUnitOfWork):
     def __init__(self, session):
         self._session = session

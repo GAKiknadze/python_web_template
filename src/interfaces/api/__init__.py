@@ -1,10 +1,13 @@
-from .v1 import router as v1_router
-from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from dishka.integrations.fastapi import setup_dishka
+
 from dishka import AsyncContainer
-from .exception_handlers import all_exceptions_handler
+from dishka.integrations.fastapi import setup_dishka
+from fastapi import FastAPI
 from loguru import logger
+
+from .exception_handlers import all_exceptions_handler
+from .v1 import router as v1_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,13 +19,11 @@ async def lifespan(app: FastAPI):
 
 def create_rest_app(container: AsyncContainer) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
-    
+
     setup_dishka(container=container, app=app)
 
     app.include_router(v1_router, prefix="/v1")
 
     app.add_exception_handler(Exception, all_exceptions_handler)
-    
+
     return app
-
-

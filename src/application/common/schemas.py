@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Literal, TypeVar, Generic
+from typing import Generic, Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
 class PaginationRequest(BaseSchema):
     limit: Literal[25, 50, 100] = Field(default=25)

@@ -11,7 +11,7 @@ class BaseRepository(Generic[MODEL_T, ENTITY_T]):
 
     def _get_concrete_type(self, index: int) -> Type:
         # Проходим по MRO, чтобы найти первый Generic-базовый класс с параметрами
-        for base in self.__class__.__orig_bases__: # type: ignore
+        for base in getattr(self.__class__, '__orig_bases__', ()):
             origin = get_origin(base)
             if origin is not None and issubclass(origin, BaseRepository):
                 args = get_args(base)

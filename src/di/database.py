@@ -11,10 +11,13 @@ class DBConfig(BaseModel):
 
 
 class DBProvider(Provider):
+    def __init__(self, config: DBConfig):
+        self._config = config
+    
     @provide(scope=Scope.APP)
-    def get_engine(self, config: DBConfig) -> AsyncEngine:
+    def get_engine(self) -> AsyncEngine:
         if getattr(self, "_engine", None) is None:
-            self._engine = create_async_engine(config.url)
+            self._engine = create_async_engine(self._config.url)
         return self._engine
     
     @provide(scope=Scope.REQUEST, provides=AsyncSession)

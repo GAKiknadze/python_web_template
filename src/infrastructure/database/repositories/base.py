@@ -21,7 +21,7 @@ class BaseRepository(Generic[MODEL_T, ENTITY_T]):
                     return args[index]
         raise TypeError(
             "Cannot determine concrete types. "
-            "Make sure your repository subclass inherits from SQLBaseRepository[Model, Entity]."
+            "Make sure your repository subclass inherits from BaseRepository[Model, Entity]."
         )
 
     def model_to_entity(self, value: MODEL_T) -> ENTITY_T:

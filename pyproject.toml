@@ -18,4 +18,8 @@ dependencies = [
 dev = [
     "ruff>=0.14.10",
 ]
+test = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]
 

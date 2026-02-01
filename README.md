@@ -1,5 +1,7 @@
 # python_web_template
 
+[![CI](https://github.com/GAKiknadze/python_web_template/actions/workflows/ci.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/ci.yml)
+
 Шаблон для создания веб-приложений на Python с архитектурой, основанной на принципах Clean Architecture и Domain-Driven Design (DDD).
 
 ## Описание
@@ -77,5 +79,75 @@ uv run pre-commit run --all-files
 ```bash
 uv run ruff check .
 uv run ruff format .
+```
+
+### CI/CD
+
+Проект настроен с GitHub Actions для автоматической проверки кода и запуска тестов.
+
+#### Workflows
+
+**1. CI Workflow** (`.github/workflows/ci.yml`)
+- **Триггеры:** Push и Pull Request в ветку `main`
+- **Jobs:**
+  - **Lint** - проверка качества кода:
+    - `ruff check` - статический анализ кода
+    - `ruff format --check` - проверка форматирования
+  - **Test** - запуск тестов:
+    - Запуск всех тестов с pytest
+    - Генерация отчета о покрытии кода
+    - Загрузка отчета в артефакты
+
+**2. Pull Request Workflow** (`.github/workflows/pr.yml`)
+- **Триггеры:** Pull Request в ветки `main` и `develop`
+- **Jobs:**
+  - **Validate** - проверка формата PR:
+    - Валидация заголовка PR (conventional commits)
+  - **Code Quality** - проверка качества кода:
+    - Ruff linter и formatter
+    - Pre-commit хуки на измененных файлах
+  - **Test Suite** - запуск тестов:
+    - Тесты с покрытием кода
+    - Проверка минимального порога покрытия
+  - **Security** - проверка безопасности:
+    - Ruff security checks (правила S*)
+  - **Summary** - общий статус всех проверок
+
+**3. Dependabot** (`.github/dependabot.yml`)
+- Автоматическое обновление зависимостей:
+  - Python пакеты (еженедельно по понедельникам)
+  - GitHub Actions (еженедельно по понедельникам)
+  - Группировка minor и patch обновлений
+
+#### Форматы коммитов для PR
+
+При создании Pull Request заголовок должен следовать conventional commits:
+
+- `feat:` - новая функциональность
+- `fix:` - исправление бага
+- `docs:` - изменения в документации
+- `style:` - форматирование кода
+- `refactor:` - рефакторинг кода
+- `perf:` - улучшение производительности
+- `test:` - добавление тестов
+- `build:` - изменения в сборке
+- `ci:` - изменения в CI/CD
+- `chore:` - рутинные задачи
+- `revert:` - откат изменений
+
+#### Локальный запуск тестов
+
+```bash
+# Установить тестовые зависимости
+uv sync --group test
+
+# Запустить тесты
+uv run pytest tests/ -v
+
+# Запустить тесты с покрытием
+uv run pytest tests/ --cov=src --cov-report=term --cov-report=html
+
+# Запустить только определенный тест
+uv run pytest tests/test_config.py::test_database_settings_defaults -v
 ```
 

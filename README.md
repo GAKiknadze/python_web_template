@@ -1,6 +1,9 @@
 # python_web_template
 
 [![CI](https://github.com/GAKiknadze/python_web_template/actions/workflows/ci.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/ci.yml)
+[![PR Checks](https://github.com/GAKiknadze/python_web_template/actions/workflows/pr.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/pr.yml)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 Шаблон для создания веб-приложений на Python с архитектурой, основанной на принципах Clean Architecture и Domain-Driven Design (DDD).
 
@@ -150,4 +153,38 @@ uv run pytest tests/ --cov=src --cov-report=term --cov-report=html
 # Запустить только определенный тест
 uv run pytest tests/test_config.py::test_database_settings_defaults -v
 ```
+
+## 📚 Дополнительные ресурсы
+
+### Шаблоны и гайды
+
+- [📋 Шаблон Pull Request](.github/pull_request_template.md) - используется автоматически при создании PR
+- [🐛 Создать Bug Report](.github/ISSUE_TEMPLATE/bug_report.md) - сообщить об ошибке
+- [✨ Предложить Feature](.github/ISSUE_TEMPLATE/feature_request.md) - предложить новую функциональность
+- [🔧 CI/CD Setup Guide](.github/SETUP.md) - полная инструкция по настройке и использованию CI/CD
+
+### Полезные ссылки
+
+- [GitHub Actions Documentation](https://docs.github.com/en/actions) - документация по GitHub Actions
+- [Ruff Documentation](https://docs.astral.sh/ruff/) - документация по Ruff
+- [pytest Documentation](https://docs.pytest.org/) - документация по pytest
+- [pre-commit Documentation](https://pre-commit.com/) - документация по pre-commit
+- [Conventional Commits](https://www.conventionalcommits.org/) - стандарт для сообщений коммитов
+- [uv Documentation](https://docs.astral.sh/uv/) - документация по uv
+
+## 🤝 Contribution
+
+При создании Pull Request:
+
+1. Убедитесь, что заголовок PR следует формату [Conventional Commits](https://www.conventionalcommits.org/)
+2. Все тесты должны проходить
+3. Код должен проходить проверки Ruff
+4. Добавьте тесты для новой функциональности
+5. Обновите документацию при необходимости
+
+Подробнее см. [шаблон PR](.github/pull_request_template.md) и [CI/CD Setup Guide](.github/SETUP.md).
+
+## 📝 Лицензия
+
+См. файл [LICENSE](LICENSE) для подробной информации.
 

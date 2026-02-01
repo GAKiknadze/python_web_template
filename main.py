@@ -1,28 +1,57 @@
+import sys
+
 import uvicorn
 from dishka import make_async_container
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from loguru import logger
 from src.di.database import DBConfig, DBProvider
+from src.infrastructure.config import get_settings
 from src.interfaces.api import create_rest_app
 
 
-class AppSettings(BaseSettings):
-    database: DBConfig = Field(...)
+def configure_logging(settings):
+    """Configure logging with settings."""
+    logger.remove()  # Remove default handler
+    logger.add(
+        sink=sys.stdout,
+        level=settings.logging.level,
+        format=settings.logging.format,
+        serialize=settings.logging.serialize,
+        diagnose=settings.logging.diagnose,
+        backtrace=settings.logging.backtrace,
+    )
 
-    class Config:
-        extra = "ignore"
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
+def main():
+    """Main application entry point."""
+    settings = get_settings()
 
-settings = AppSettings()  # pyright: ignore[reportCallIssue]
+    # Configure logging
+    configure_logging(settings)
 
-container = make_async_container(
-    DBProvider(config=settings.database),
-)
+    logger.info(f"Starting {settings.app.name} v{settings.app.version}")
+    logger.info(f"Environment: {settings.app.environment}")
+    logger.info(f"Debug mode: {settings.app.debug}")
 
-app = create_rest_app(container)
+    # Create database configuration
+    db_config = DBConfig(url=settings.database.url)
+
+    # Create DI container
+    container = make_async_container(
+        DBProvider(config=db_config),
+    )
+
+    # Create FastAPI application
+    app = create_rest_app(container)
+
+    # Run application
+    uvicorn.run(
+        app=app,
+        host=settings.app.host,
+        port=settings.app.port,
+        reload=settings.app.reload,
+        workers=settings.app.workers,
+    )
 
 
 if __name__ == "__main__":
-    uvicorn.run(app=app)
+    main()

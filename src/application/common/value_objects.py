@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Self
 
 from src.domain.common.entity import UuidEntityId
@@ -7,7 +7,7 @@ from src.domain.common.entity import UuidEntityId
 EventId = UuidEntityId
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Типы событий для outbox pattern"""
 
     MESSAGE = "message"  # Сообщение пользователю (email, sms и т.д.)

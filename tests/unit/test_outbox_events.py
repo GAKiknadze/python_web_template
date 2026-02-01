@@ -193,14 +193,14 @@ class TestOutboxEvent:
         # В Python это вызывает AttributeError или FrozenInstanceError
         try:
             event.payload = {"new": "payload"}  # type: ignore
-            assert False, "Should have raised an exception"
-        except (AttributeError, Exception):
+            pytest.fail("Should have raised an exception")
+        except AttributeError:
             pass  # Expected
 
         try:
             event.event_type = EventType.CUSTOM  # type: ignore
-            assert False, "Should have raised an exception"
-        except (AttributeError, Exception):
+            pytest.fail("Should have raised an exception")
+        except AttributeError:
             pass  # Expected
 
 

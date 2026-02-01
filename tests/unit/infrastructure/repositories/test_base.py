@@ -1,6 +1,5 @@
-from datetime import datetime
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -100,7 +99,7 @@ def article_repository(mock_session: AsyncMock) -> ArticleRepository:
 def user_model() -> UserModel:
     """Создает тестовую модель пользователя."""
     test_id = uuid4()
-    now = datetime.now()
+    now = datetime.now(UTC)
     model = UserModel(
         id=test_id,
         name="Test User",
@@ -114,7 +113,7 @@ def user_model() -> UserModel:
 def user_entity() -> UserEntity:
     """Создает тестовую сущность пользователя."""
     test_id = UuidEntityId(uuid4())
-    now = datetime.now()
+    now = datetime.now(UTC)
     entity = UserEntity(
         id=test_id,
         name="Test User Entity",
@@ -199,7 +198,7 @@ class TestModelToEntity:
     def test_model_to_entity_with_uuid_entity_id(self, user_repository: UserRepository) -> None:
         """Проверяет конвертацию с UuidEntityId."""
         test_id = uuid4()
-        now = datetime.now()
+        now = datetime.now(UTC)
         model = UserModel(
             id=test_id,
             name="UUID Test",
@@ -231,7 +230,7 @@ class TestModelToEntity:
             id=uuid4(),
             name="Valid Name",
             value=50,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         # Должна пройти успешно
@@ -259,7 +258,7 @@ class TestEntityToModel:
     def test_entity_to_model_with_uuid_entity_id(self, user_repository: UserRepository) -> None:
         """Проверяет конвертацию с UuidEntityId."""
         test_id = UuidEntityId(uuid4())
-        now = datetime.now()
+        now = datetime.now(UTC)
         entity = UserEntity(
             id=test_id,
             name="Entity to Model Test",
@@ -358,7 +357,7 @@ class TestEdgeCases:
             id=UuidEntityId(uuid4()),
             name="Zero Test",
             value=0,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         model = user_repository.entity_to_model(entity)
@@ -387,7 +386,7 @@ class TestTypeSystem:
 
     def test_repository_is_generic(self) -> None:
         """Проверяет, что BaseRepository является дженериком."""
-        from typing import get_args, get_origin
+        from typing import get_origin
 
         # Проверяем, что UserRepository имеет правильное происхождение
         origin = get_origin(UserRepository.__orig_bases__[0])
@@ -416,7 +415,7 @@ class TestWithDifferentDataTypes:
 
     def test_with_datetime(self, user_repository: UserRepository) -> None:
         """Проверяет работу с datetime."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         entity = UserEntity(
             id=UuidEntityId(uuid4()),
             name="DateTime Test",
@@ -438,7 +437,7 @@ class TestWithDifferentDataTypes:
             id=entity_id,
             name="UUID Test",
             value=123,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         model = user_repository.entity_to_model(entity)
@@ -485,7 +484,7 @@ class TestUuidEntityIdSerialization:
             id=test_id,
             name="Serialization Test",
             value=42,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         # model_dump() должен вернуть словарь со строковым id
@@ -503,7 +502,7 @@ class TestUuidEntityIdSerialization:
             id=uuid_str,  # type: ignore
             name="String UUID Test",
             value=1,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         # SQLAlchemy должна конвертировать строку в UUID
@@ -517,7 +516,7 @@ class TestUuidEntityIdSerialization:
             id=UuidEntityId(original_uuid),
             name="UUID Preservation Test",
             value=999,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         model = user_repository.entity_to_model(entity)

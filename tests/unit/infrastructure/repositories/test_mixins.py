@@ -27,7 +27,7 @@ class IntEntityId(EntityId[int]):
     def _new(cls) -> int:
         import random
 
-        return random.randint(1, 1000000)
+        return random.randint(1, 1000000)  # noqa: S311
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: type, handler: GetCoreSchemaHandler) -> CoreSchema:

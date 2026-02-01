@@ -44,3 +44,23 @@ class DeleteByIdMethodMixin(Generic[ENTITY_ID_T], ABC):
         if model is None:
             return
         await self._session.delete(model)
+
+
+class SoftDeleteByIdMethodMixin(Generic[ENTITY_T, ENTITY_ID_T], ABC):
+    _session: AsyncSession
+    _model_cls: type
+    _soft_delete_field: str
+
+    async def soft_delete_by_id(self, value: ENTITY_ID_T) -> None:
+        model = await self._session.get(self._model_cls, value)
+        if model is None:
+            return
+        setattr(model, self._soft_delete_field, True)
+        await self._session.flush()
+
+    async def restore_by_id(self, value: ENTITY_ID_T) -> None:
+        model = await self._session.get(self._model_cls, value)
+        if model is None:
+            return
+        setattr(model, self._soft_delete_field, False)
+        await self._session.flush()

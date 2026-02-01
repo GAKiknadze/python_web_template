@@ -1,17 +1,18 @@
 from typing import Protocol
 
-from .value_objects import OutboxMessage
+from .value_objects import OutboxEvent
 
 
 class IUnitOfWork(Protocol):
-    _messages: list[OutboxMessage]
+    _events: list[OutboxEvent]
 
     async def __aenter__(self) -> "IUnitOfWork": ...
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
 
-    async def register_outbox_message(self, message: OutboxMessage) -> None:
-        self._messages.append(message)
+    async def register_event(self, event: OutboxEvent) -> None:
+        """Регистрирует событие для отправки через outbox pattern"""
+        self._events.append(event)
 
     async def commit(self) -> None: ...
 

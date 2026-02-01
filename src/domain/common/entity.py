@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import Generic, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, GetCoreSchemaHandler
@@ -10,10 +9,7 @@ class Entity(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-T = TypeVar("T")
-
-
-class EntityId(Generic[T]):
+class EntityId[T]:
     __slots__ = ("_value",)
 
     def __init__(self, value: T | None = None) -> None:

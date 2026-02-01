@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .types import ENTITY_ID_T, ENTITY_T
 
-
-class SaveMethodMixin(Generic[ENTITY_T], ABC):
+class SaveMethodMixin[ENTITY_T](ABC):
     _session: AsyncSession
 
     @abstractmethod
@@ -23,7 +21,7 @@ class SaveMethodMixin(Generic[ENTITY_T], ABC):
         return self.model_to_entity(merged_model)
 
 
-class GetByIdMethodMixin(Generic[ENTITY_T, ENTITY_ID_T], ABC):
+class GetByIdMethodMixin[ENTITY_T, ENTITY_ID_T](ABC):
     _session: AsyncSession
     _model_cls: type
 
@@ -35,7 +33,7 @@ class GetByIdMethodMixin(Generic[ENTITY_T, ENTITY_ID_T], ABC):
         return self.model_to_entity(model) if model else None
 
 
-class DeleteByIdMethodMixin(Generic[ENTITY_ID_T], ABC):
+class DeleteByIdMethodMixin[ENTITY_ID_T](ABC):
     _session: AsyncSession
     _model_cls: type
 
@@ -46,7 +44,7 @@ class DeleteByIdMethodMixin(Generic[ENTITY_ID_T], ABC):
         await self._session.delete(model)
 
 
-class SoftDeleteByIdMethodMixin(Generic[ENTITY_T, ENTITY_ID_T], ABC):
+class SoftDeleteByIdMethodMixin[ENTITY_T, ENTITY_ID_T](ABC):
     _session: AsyncSession
     _model_cls: type
     _soft_delete_field: str

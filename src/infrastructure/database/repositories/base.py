@@ -1,11 +1,9 @@
-from typing import Generic, get_args, get_origin
+from typing import get_args, get_origin
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .types import ENTITY_T, MODEL_T
 
-
-class BaseRepository(Generic[MODEL_T, ENTITY_T]):
+class BaseRepository[MODEL_T, ENTITY_T]:
     def __init__(self, session: AsyncSession):
         self._session = session
         self._model_cls = self._get_concrete_type(0)

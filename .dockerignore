@@ -109,7 +109,7 @@ yarn-error.log
 alembic.ini
 
 # UV/pip
-uv.lock
+# uv.lock - KEEP THIS! It's needed for Docker builds
 poetry.lock
 Pipfile.lock
 requirements*.txt

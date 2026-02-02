@@ -10,18 +10,18 @@ on:
       - main
   schedule:
     # Run every Sunday at 3:00 AM UTC
-    - cron: '0 3 * * 0'
+    - cron: "0 3 * * 0"
   workflow_dispatch:
     inputs:
       duration:
-        description: 'Test duration in seconds'
+        description: "Test duration in seconds"
         required: false
-        default: '60'
+        default: "60"
         type: string
       users:
-        description: 'Number of concurrent users'
+        description: "Number of concurrent users"
         required: false
-        default: '100'
+        default: "100"
         type: string
 
 permissions:
@@ -173,11 +173,11 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmark-results.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
-          alert-threshold: '150%'
+          alert-threshold: "150%"
           comment-on-alert: true
           fail-on-alert: false
 
@@ -351,16 +351,26 @@ jobs:
       - name: Comment on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          LOAD_TEST_RESULT: ${{ needs.load-test.result }}
+          BENCHMARK_RESULT: ${{ needs.benchmark.result }}
+          MEMORY_PROFILING_RESULT: ${{ needs.memory-profiling.result }}
+          API_PERFORMANCE_RESULT: ${{ needs.api-performance.result }}
         with:
           script: |
+            const loadTestStatus = process.env.LOAD_TEST_RESULT === 'success' ? '✅ Passed' : '❌ Failed';
+            const benchmarkStatus = process.env.BENCHMARK_RESULT === 'success' ? '✅ Passed' : '❌ Failed';
+            const memoryProfilingStatus = process.env.MEMORY_PROFILING_RESULT === 'success' ? '✅ Passed' : '❌ Failed';
+            const apiPerformanceStatus = process.env.API_PERFORMANCE_RESULT === 'success' ? '✅ Passed' : '❌ Failed';
+
             const summary = `## 🚀 Performance Testing Results
 
             | Test Type | Status |
             |-----------|--------|
-            | Load Testing | ${{ needs.load-test.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
-            | Benchmarks | ${{ needs.benchmark.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
-            | Memory Profiling | ${{ needs.memory-profiling.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
-            | API Performance | ${{ needs.api-performance.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
+            | Load Testing | ${loadTestStatus} |
+            | Benchmarks | ${benchmarkStatus} |
+            | Memory Profiling | ${memoryProfilingStatus} |
+            | API Performance | ${apiPerformanceStatus} |
 
             View detailed results in the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).`;
 

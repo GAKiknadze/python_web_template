@@ -1,0 +1,275 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      is-prerelease: ${{ steps.check-prerelease.outputs.is-prerelease }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get-version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Check if prerelease
+        id: check-prerelease
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+            echo "This is a prerelease"
+          else
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            echo "This is a stable release"
+          fi
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3 or v1.2.3-beta.1"
+            exit 1
+          fi
+
+  test:
+    name: Run Full Test Suite
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --group dev --group test
+
+      - name: Run linter
+        run: uv run ruff check .
+
+      - name: Run formatter check
+        run: uv run ruff format --check .
+
+      - name: Run tests with coverage
+        run: |
+          uv add --dev pytest-cov
+          uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+
+  build-artifacts:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/*
+          retention-days: 30
+
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "First release - no previous tag found"
+            CHANGELOG="## 🎉 First Release\n\n"
+            CHANGELOG+="### All Changes\n"
+            CHANGELOG+=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from $PREV_TAG to $VERSION"
+            CHANGELOG="## Changes from $PREV_TAG to $VERSION\n\n"
+
+            # Features
+            FEATURES=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges --grep="^feat" || echo "")
+            if [ -n "$FEATURES" ]; then
+              CHANGELOG+="### ✨ Features\n$FEATURES\n\n"
+            fi
+
+            # Bug Fixes
+            FIXES=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges --grep="^fix" || echo "")
+            if [ -n "$FIXES" ]; then
+              CHANGELOG+="### 🐛 Bug Fixes\n$FIXES\n\n"
+            fi
+
+            # Documentation
+            DOCS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges --grep="^docs" || echo "")
+            if [ -n "$DOCS" ]; then
+              CHANGELOG+="### 📚 Documentation\n$DOCS\n\n"
+            fi
+
+            # Other changes
+            OTHERS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges --grep="^feat" --grep="^fix" --grep="^docs" --invert-grep || echo "")
+            if [ -n "$OTHERS" ]; then
+              CHANGELOG+="### 🔧 Other Changes\n$OTHERS\n\n"
+            fi
+          fi
+
+          # Save to file
+          echo -e "$CHANGELOG" > CHANGELOG.md
+
+          # Output for GitHub
+          {
+            echo "changelog<<EOF"
+            cat CHANGELOG.md
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, test, build-artifacts, generate-changelog]
+    outputs:
+      release-url: ${{ steps.create-release.outputs.html_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
+
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+
+      - name: Create Release
+        id: create-release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Release ${{ needs.validate.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ needs.validate.outputs.is-prerelease == 'true' }}
+          files: |
+            dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [validate, create-release]
+    if: needs.validate.outputs.is-prerelease == 'false'
+    environment:
+      name: pypi
+      url: https://pypi.org/project/python-web-template
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+          verbose: true
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [validate, create-release]
+    if: always()
+
+    steps:
+      - name: Release Summary
+        run: |
+          echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type:** ${{ needs.validate.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL:** ${{ needs.create-release.outputs.release-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Release completed successfully!" >> $GITHUB_STEP_SUMMARY

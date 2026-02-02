@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        PYTHON_VERSION: 3.13
+        UV_VERSION: 0.5.11
+    container_name: python-web-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - venv:/app/.venv
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: python-web-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=appdb
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: python-web-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+
+  # Mailhog for email testing (optional)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: python-web-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - app-network
+    restart: unless-stopped
+    profiles:
+      - tools
+
+  # Nginx reverse proxy (optional, for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: python-web-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - app-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+  venv:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

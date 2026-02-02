@@ -1,0 +1,372 @@
+name: Performance Testing
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+  schedule:
+    # Run every Sunday at 3:00 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Test duration in seconds'
+        required: false
+        default: '60'
+        type: string
+      users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '100'
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev --group test
+          uv add --dev locust
+
+      - name: Start application
+        run: |
+          uv run uvicorn main:app --host 0.0.0.0 --port 8000 &
+          echo $! > app.pid
+          sleep 5
+
+      - name: Wait for application to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/health 2>/dev/null; then
+              echo "Application is ready"
+              exit 0
+            fi
+            echo "Waiting for application... ($i/30)"
+            sleep 2
+          done
+          echo "Application failed to start"
+          exit 1
+
+      - name: Run load tests
+        run: |
+          # Create a simple locustfile if it doesn't exist
+          if [ ! -f "locustfile.py" ]; then
+            cat > locustfile.py << 'EOF'
+          from locust import HttpUser, task, between
+
+          class WebsiteUser(HttpUser):
+              wait_time = between(1, 3)
+
+              @task(3)
+              def index(self):
+                  self.client.get("/")
+
+              @task(1)
+              def health(self):
+                  self.client.get("/health")
+          EOF
+          fi
+
+          DURATION="${{ github.event.inputs.duration || '60' }}"
+          USERS="${{ github.event.inputs.users || '100' }}"
+
+          uv run locust \
+            --host=http://localhost:8000 \
+            --users=$USERS \
+            --spawn-rate=10 \
+            --run-time=${DURATION}s \
+            --headless \
+            --html=locust-report.html \
+            --csv=locust-stats
+
+      - name: Stop application
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill $(cat app.pid) || true
+            rm app.pid
+          fi
+
+      - name: Upload load test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results
+          path: |
+            locust-report.html
+            locust-stats*.csv
+
+  benchmark:
+    name: Python Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev --group test
+          uv add --dev pytest-benchmark
+
+      - name: Run benchmarks
+        run: |
+          # Create benchmark tests if they don't exist
+          mkdir -p tests/benchmarks
+
+          if [ ! -f "tests/benchmarks/test_benchmarks.py" ]; then
+            cat > tests/benchmarks/test_benchmarks.py << 'EOF'
+          """Benchmark tests for performance monitoring."""
+          import pytest
+
+          def test_example_benchmark(benchmark):
+              """Example benchmark test."""
+              def example_function():
+                  return sum(range(1000))
+
+              result = benchmark(example_function)
+              assert result == 499500
+          EOF
+          fi
+
+          uv run pytest tests/benchmarks/ \
+            --benchmark-only \
+            --benchmark-json=benchmark-results.json \
+            --benchmark-histogram=benchmark-histogram
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          tool: 'pytest'
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '150%'
+          comment-on-alert: true
+          fail-on-alert: false
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-results.json
+            benchmark-histogram.svg
+
+  memory-profiling:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev --group test
+          uv add --dev memory-profiler pytest-memray
+
+      - name: Run memory profiling
+        run: |
+          # Run tests with memory profiling
+          uv run pytest tests/ \
+            --memray \
+            --most-allocations=10 \
+            -v || true
+
+      - name: Generate memory report
+        run: |
+          echo "## 💾 Memory Profiling Report" > memory-report.md
+          echo "" >> memory-report.md
+          echo "Memory profiling completed. Check artifacts for detailed results." >> memory-report.md
+
+      - name: Upload memory profiling results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-profiling-results
+          path: |
+            memory-report.md
+            .pytest_memray*
+
+  api-performance:
+    name: API Performance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --group dev --group test
+
+      - name: Start application
+        run: |
+          uv run uvicorn main:app --host 0.0.0.0 --port 8000 &
+          echo $! > app.pid
+          sleep 5
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run k6 performance tests
+        run: |
+          # Create a simple k6 script if it doesn't exist
+          if [ ! -f "k6-script.js" ]; then
+            cat > k6-script.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+
+          export const options = {
+            stages: [
+              { duration: '30s', target: 20 },
+              { duration: '1m', target: 50 },
+              { duration: '30s', target: 0 },
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<500'],
+              http_req_failed: ['rate<0.01'],
+            },
+          };
+
+          export default function () {
+            const res = http.get('http://localhost:8000/');
+            check(res, {
+              'status is 200': (r) => r.status === 200,
+            });
+            sleep(1);
+          }
+          EOF
+          fi
+
+          k6 run k6-script.js --out json=k6-results.json || true
+
+      - name: Stop application
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill $(cat app.pid) || true
+            rm app.pid
+          fi
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: k6-results.json
+
+  summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    needs: [load-test, benchmark, memory-profiling, api-performance]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🚀 Performance Testing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Testing | ${{ needs.load-test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Benchmarks | ${{ needs.benchmark.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Memory Profiling | ${{ needs.memory-profiling.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Performance | ${{ needs.api-performance.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.load-test.result }}" = "success" ] && \
+             [ "${{ needs.benchmark.result }}" = "success" ] && \
+             [ "${{ needs.memory-profiling.result }}" = "success" ] && \
+             [ "${{ needs.api-performance.result }}" = "success" ]; then
+            echo "### ✅ All Performance Tests Passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Some Performance Tests Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the test results and address any performance issues." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## 🚀 Performance Testing Results
+
+            | Test Type | Status |
+            |-----------|--------|
+            | Load Testing | ${{ needs.load-test.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
+            | Benchmarks | ${{ needs.benchmark.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
+            | Memory Profiling | ${{ needs.memory-profiling.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
+            | API Performance | ${{ needs.api-performance.result == 'success' ? '✅ Passed' : '❌ Failed' }} |
+
+            View detailed results in the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

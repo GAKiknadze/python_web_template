@@ -2,8 +2,12 @@
 
 [![CI](https://github.com/GAKiknadze/python_web_template/actions/workflows/ci.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/ci.yml)
 [![PR Checks](https://github.com/GAKiknadze/python_web_template/actions/workflows/pr.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/pr.yml)
+[![CD](https://github.com/GAKiknadze/python_web_template/actions/workflows/cd.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/cd.yml)
+[![Docker](https://github.com/GAKiknadze/python_web_template/actions/workflows/docker.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/docker.yml)
+[![CodeQL](https://github.com/GAKiknadze/python_web_template/actions/workflows/codeql.yml/badge.svg)](https://github.com/GAKiknadze/python_web_template/actions/workflows/codeql.yml)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Шаблон для создания веб-приложений на Python с архитектурой, основанной на принципах Clean Architecture и Domain-Driven Design (DDD).
 
@@ -241,6 +245,8 @@ HTML отчет о покрытии будет доступен в `htmlcov/inde
 
 ## 🤖 CI/CD
 
+Проект включает полный набор CI/CD пайплайнов для автоматизации разработки, тестирования и развертывания.
+
 ### GitHub Actions Workflows
 
 #### 1. CI Workflow (`.github/workflows/ci.yml`)
@@ -265,12 +271,129 @@ HTML отчет о покрытии будет доступен в `htmlcov/inde
 - **Security** - проверка безопасности (Bandit rules)
 - **Summary** - итоговый статус всех проверок
 
-#### 3. Dependabot (`.github/dependabot.yml`)
+#### 3. CD Workflow (`.github/workflows/cd.yml`)
+
+Continuous Deployment пайплайн:
+
+- **Build** - сборка Docker образа
+  - Multi-platform (amd64/arm64)
+  - Публикация в GitHub Container Registry
+- **Deploy Staging** - автоматический деплой на staging
+  - Запускается при push в `main`
+  - Smoke тесты
+- **Deploy Production** - деплой на production
+  - Запускается при создании тега `v*.*.*`
+  - Требует ручного подтверждения
+- **Rollback** - автоматический откат при ошибках
+
+#### 4. Release Workflow (`.github/workflows/release.yml`)
+
+Автоматизация релизов:
+
+- **Validate** - валидация версии и формата тега
+- **Test** - полный прогон тестов
+- **Build Artifacts** - сборка дистрибутивов
+- **Generate Changelog** - автоматическая генерация changelog
+- **Create Release** - создание GitHub Release
+- **Publish PyPI** - публикация в PyPI (только stable releases)
+
+#### 5. Docker Workflow (`.github/workflows/docker.yml`)
+
+Сборка и публикация Docker образов:
+
+- **Lint** - проверка Dockerfile с hadolint
+- **Build & Test** - сборка и тестирование образа
+  - Smoke тесты контейнера
+  - Сканирование уязвимостей (Trivy)
+- **Push** - публикация образов в registry
+  - Поддержка multi-platform
+  - Автоматическая генерация тегов
+  - Build attestation
+
+#### 6. Dependency Review (`.github/workflows/dependency-review.yml`)
+
+Проверка безопасности зависимостей:
+
+- **Dependency Review** - анализ изменений зависимостей в PR
+- **Vulnerability Scan** - сканирование известных уязвимостей (Safety)
+- **License Check** - проверка лицензий
+- **Outdated Check** - поиск устаревших пакетов
+- **Scheduled Scans** - еженедельные автоматические проверки
+
+#### 7. CodeQL Analysis (`.github/workflows/codeql.yml`)
+
+Статический анализ безопасности:
+
+- **CodeQL Scanning** - поиск уязвимостей в коде
+- **Security & Quality Queries** - расширенные проверки
+- **SARIF Upload** - интеграция с GitHub Security
+- **Daily Scans** - ежедневные автоматические проверки
+
+#### 8. Performance Testing (`.github/workflows/performance.yml`)
+
+Тестирование производительности:
+
+- **Load Testing** - нагрузочное тестирование (Locust)
+- **Benchmarks** - Python бенчмарки (pytest-benchmark)
+- **Memory Profiling** - профилирование памяти (memray)
+- **API Performance** - тесты производительности API (k6)
+- **PR Comments** - автоматические отчеты в PR
+
+#### 9. Dependabot (`.github/dependabot.yml`)
 
 Автоматическое обновление зависимостей:
 - Python пакеты (еженедельно, понедельник)
 - GitHub Actions (еженедельно, понедельник)
 - Группировка minor/patch обновлений
+
+### Docker Support
+
+#### Dockerfile
+
+Multi-stage Dockerfile с оптимизацией:
+
+- **Base** - базовый образ с системными зависимостями
+- **Builder** - установка Python зависимостей через uv
+- **Runtime** - минимальный production образ
+- **Development** - образ для разработки с hot-reload
+
+Запуск:
+```bash
+# Production build
+docker build -t python-web-app .
+
+# Development build
+docker build --target development -t python-web-app:dev .
+
+# Run container
+docker run -p 8000:8000 python-web-app
+```
+
+#### Docker Compose
+
+Полное окружение для разработки:
+
+```bash
+# Запуск всех сервисов
+docker-compose up -d
+
+# Запуск с дополнительными инструментами (pgAdmin, Mailhog)
+docker-compose --profile tools up -d
+
+# Просмотр логов
+docker-compose logs -f app
+
+# Остановка
+docker-compose down
+```
+
+Включенные сервисы:
+- **app** - основное приложение
+- **db** - PostgreSQL 16
+- **redis** - Redis 7
+- **pgadmin** - веб-интерфейс для PostgreSQL (profile: tools)
+- **mailhog** - SMTP тестирование (profile: tools)
+- **nginx** - reverse proxy (profile: production)
 
 ### Форматы коммитов
 
